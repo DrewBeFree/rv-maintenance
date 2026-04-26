@@ -24,6 +24,8 @@ const SEED_AREAS = [
   { slug: 'water',        name: 'Water System',          icon: '💧',  interval: 180 },
   { slug: 'hvac',         name: 'HVAC',                  icon: '🌬️', interval: 365 },
   { slug: 'tires',        name: 'Tires / Wheels',        icon: '🛞',  interval: 90  },
+  { slug: 'trip-departure', name: 'Trip Departure',      icon: '🛣️', interval: 30  },
+  { slug: 'pack-out',       name: 'Pack Out',             icon: '🏕️', interval: 30  },
 ];
 
 const SEED_ITEMS = {
@@ -153,6 +155,40 @@ const SEED_ITEMS = {
     'Inspect brake drums or rotors for scoring',
     'Check wheel bearings — no play, no heat after short drive',
   ],
+  'trip-departure': [
+    'Check tire pressure — all 6 tires (cold)',
+    'Inspect tires for visible damage or foreign objects',
+    'Confirm all slide-outs are fully retracted',
+    'Retract and lock all leveling jacks / stabilizers',
+    'Retract awning fully',
+    'Disconnect and stow shore power cord',
+    'Disconnect and store fresh water hose',
+    'Close and latch all exterior compartment doors',
+    'Turn off propane at tank valve',
+    'Close all roof vents',
+    'Secure all interior loose items and cabinet latches',
+    'Check all exterior lights — headlights, tails, signals, brake lights',
+    'Confirm black and gray tanks have capacity for the trip',
+    'Walk full perimeter — nothing snagged, dragging, or left behind',
+  ],
+  'pack-out': [
+    'Connect sewer hose to dump station',
+    'Open black tank valve — drain completely',
+    'Close black tank valve',
+    'Flush black tank with built-in rinse wand',
+    'Open gray tank valve — use gray water to flush sewer hose',
+    'Close gray tank valve',
+    'Remove, rinse, and stow sewer hose',
+    'Rinse dump station pad',
+    'Disconnect shore power and stow cord',
+    'Disconnect water hose and stow',
+    'Retract awning',
+    'Retract all slide-outs',
+    'Retract leveling jacks / stabilizers',
+    'Walk campsite — collect chairs, mats, wheel chocks, stakes',
+    'Final perimeter walk — nothing left behind',
+    'Lock all exterior compartment doors',
+  ],
 };
 
 // ── Seed on First Load ────────────────────────────────────────
@@ -185,6 +221,39 @@ async function seedIfEmpty() {
 
   const { error: itemErr } = await sb.from('checklist_items').insert(items);
   if (itemErr) console.error('Seed items failed:', itemErr);
+}
+
+async function ensureNewAreas() {
+  const { data: existing } = await sb.from('areas').select('slug, sort_order');
+  const existingSlugs = new Set((existing || []).map(a => a.slug));
+  const missing = SEED_AREAS.filter(a => !existingSlugs.has(a.slug));
+  if (missing.length === 0) return;
+
+  const maxOrder = Math.max(...(existing || []).map(a => a.sort_order), -1);
+  const { data: inserted, error } = await sb
+    .from('areas')
+    .insert(missing.map((a, i) => ({
+      slug: a.slug, name: a.name, icon: a.icon,
+      sort_order: maxOrder + 1 + i, reminder_interval_days: a.interval,
+    })))
+    .select();
+
+  if (error) { console.error('ensureNewAreas failed:', error); return; }
+
+  const areaMap = {};
+  (inserted || []).forEach(a => { areaMap[a.slug] = a.id; });
+
+  const items = [];
+  missing.forEach(a => {
+    (SEED_ITEMS[a.slug] || []).forEach((text, i) => {
+      items.push({ area_id: areaMap[a.slug], text, sort_order: i, is_active: true });
+    });
+  });
+
+  if (items.length > 0) {
+    const { error: itemErr } = await sb.from('checklist_items').insert(items);
+    if (itemErr) console.error('ensureNewAreas items failed:', itemErr);
+  }
 }
 
 // ── Hub View ──────────────────────────────────────────────────
@@ -363,6 +432,7 @@ async function showSection(area) {
 // ── Boot ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   await seedIfEmpty();
+  await ensureNewAreas();
   await showHub();
 
   document.getElementById('back-btn').addEventListener('click', showHub);
