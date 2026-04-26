@@ -41,7 +41,7 @@
         <span id="progress-label"></span>
       </div>
       <ul id="checklist"></ul>
-      <textarea id="session-notes" placeholder="Notes (optional)…" class="hidden"></textarea>
+      <textarea id="session-notes" placeholder="Notes (optional)…" class="hidden" rows="4"></textarea>
       <div class="action-row">
         <button id="start-session-btn" class="primary-btn">Start Session</button>
         <button id="complete-session-btn" class="primary-btn hidden">Complete Session</button>
@@ -52,13 +52,13 @@
     <div id="edit-mode" class="hidden">
       <ul id="edit-list"></ul>
       <div class="add-row">
-        <input id="new-item-input" type="text" placeholder="Add checklist item…">
+        <input id="new-item-input" type="text" placeholder="Add checklist item…" maxlength="200">
         <button id="add-item-btn">Add</button>
       </div>
     </div>
 
     <!-- History Panel -->
-    <div id="history-panel">
+    <div id="history-panel" class="hidden">
       <h3 class="history-heading">History</h3>
       <div id="history-list"></div>
     </div>
