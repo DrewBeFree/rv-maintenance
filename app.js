@@ -384,5 +384,85 @@ async function completeSession() {
 
   await showHub();
 }
-async function loadEditMode() {}
-async function addItem() {}
+async function loadEditMode() {
+  const { data: items } = await sb
+    .from('checklist_items')
+    .select('*')
+    .eq('area_id', currentArea.id)
+    .eq('is_active', true)
+    .order('sort_order');
+
+  const list = document.getElementById('edit-list');
+  list.innerHTML = '';
+
+  (items || []).forEach((item, idx) => {
+    const li = document.createElement('li');
+    li.dataset.id = item.id;
+
+    li.innerHTML = `
+      <button class="move-btn" data-dir="up" ${idx === 0 ? 'disabled style="opacity:0.3"' : ''}>▲</button>
+      <button class="move-btn" data-dir="down" ${idx === items.length - 1 ? 'disabled style="opacity:0.3"' : ''}>▼</button>
+      <span class="edit-text">${item.text}</span>
+      <button class="delete-btn">✕</button>
+    `;
+
+    li.querySelector('[data-dir="up"]').addEventListener('click', () => moveItem(item.id, 'up'));
+    li.querySelector('[data-dir="down"]').addEventListener('click', () => moveItem(item.id, 'down'));
+    li.querySelector('.delete-btn').addEventListener('click', () => deleteItem(item.id));
+
+    list.appendChild(li);
+  });
+}
+async function addItem() {
+  const input = document.getElementById('new-item-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const { data: existing } = await sb
+    .from('checklist_items')
+    .select('sort_order')
+    .eq('area_id', currentArea.id)
+    .eq('is_active', true)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  const nextOrder = existing && existing.length > 0 ? existing[0].sort_order + 1 : 0;
+
+  await sb.from('checklist_items').insert({
+    area_id: currentArea.id,
+    text,
+    sort_order: nextOrder,
+    is_active: true,
+  });
+
+  input.value = '';
+  await loadEditMode();
+}
+
+async function deleteItem(itemId) {
+  await sb.from('checklist_items').update({ is_active: false }).eq('id', itemId);
+  await loadEditMode();
+}
+
+async function moveItem(itemId, direction) {
+  const { data: items } = await sb
+    .from('checklist_items')
+    .select('id, sort_order')
+    .eq('area_id', currentArea.id)
+    .eq('is_active', true)
+    .order('sort_order');
+
+  const idx = items.findIndex(i => i.id === itemId);
+  const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= items.length) return;
+
+  const a = items[idx];
+  const b = items[swapIdx];
+
+  await Promise.all([
+    sb.from('checklist_items').update({ sort_order: b.sort_order }).eq('id', a.id),
+    sb.from('checklist_items').update({ sort_order: a.sort_order }).eq('id', b.id),
+  ]);
+
+  await loadEditMode();
+}
