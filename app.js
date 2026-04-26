@@ -442,12 +442,13 @@ async function completeSession() {
 
   const { data: session, error: sessionErr } = await sb
     .from('sessions')
-    .insert({ area_id: currentArea.id, notes })
+    .insert({ area_id: currentArea.id, notes, completed_at: new Date().toISOString() })
     .select()
     .single();
 
   if (sessionErr) {
     console.error('Session insert failed:', sessionErr);
+    alert('Failed to save session. Check the console for details.');
     btn.disabled = false;
     return;
   }
