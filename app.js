@@ -4,6 +4,14 @@ let currentArea = null;
 let sessionActive = false;
 let checkedItems = new Set();
 
+function esc(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 // ── Seed Data ────────────────────────────────────────────────
 const SEED_AREAS = [
   { slug: 'winterize',    name: 'Winterize',            icon: '❄️',  interval: 365 },
@@ -338,11 +346,20 @@ async function loadHistory() {
     return;
   }
 
+  const sessionIds = sessions.map(s => s.id);
+  const { data: allItems } = await sb
+    .from('session_items')
+    .select('session_id, item_text, checked')
+    .in('session_id', sessionIds);
+
+  const itemsBySession = {};
+  (allItems || []).forEach(i => {
+    if (!itemsBySession[i.session_id]) itemsBySession[i.session_id] = [];
+    itemsBySession[i.session_id].push(i);
+  });
+
   for (const session of sessions) {
-    const { data: items } = await sb
-      .from('session_items')
-      .select('item_text, checked')
-      .eq('session_id', session.id);
+    const items = itemsBySession[session.id] || [];
 
     const entry = document.createElement('div');
     entry.className = 'history-entry';
@@ -358,10 +375,10 @@ async function loadHistory() {
         <span class="history-date">${dateStr} &mdash; ${checkedCount}/${total} items</span>
         <span class="history-toggle">▾ Details</span>
       </div>
-      ${session.notes ? `<p class="history-notes">${session.notes}</p>` : ''}
+      ${session.notes ? `<p class="history-notes">${esc(session.notes)}</p>` : ''}
       <ul class="history-items">
         ${(items || []).map(i =>
-          `<li class="${i.checked ? '' : 'unchecked'}">${i.item_text}</li>`
+          `<li class="${i.checked ? '' : 'unchecked'}">${esc(i.item_text)}</li>`
         ).join('')}
       </ul>
     `;
@@ -379,6 +396,7 @@ async function loadHistory() {
   document.getElementById('history-panel').classList.remove('hidden');
 }
 function startSession() {
+  if (sessionActive) return;
   sessionActive = true;
   document.getElementById('start-session-btn').classList.add('hidden');
   document.getElementById('complete-session-btn').classList.remove('hidden');
@@ -417,6 +435,9 @@ function updateProgress(total) {
   document.getElementById('progress-label').textContent = `${count} / ${total}`;
 }
 async function completeSession() {
+  const btn = document.getElementById('complete-session-btn');
+  btn.disabled = true;
+
   const notes = document.getElementById('session-notes').value.trim() || null;
 
   const { data: session, error: sessionErr } = await sb
@@ -425,7 +446,11 @@ async function completeSession() {
     .select()
     .single();
 
-  if (sessionErr) { console.error('Session insert failed:', sessionErr); return; }
+  if (sessionErr) {
+    console.error('Session insert failed:', sessionErr);
+    btn.disabled = false;
+    return;
+  }
 
   const allItems = document.querySelectorAll('#checklist li');
   const sessionItems = Array.from(allItems).map(li => ({
@@ -457,7 +482,7 @@ async function loadEditMode() {
     li.innerHTML = `
       <button class="move-btn" data-dir="up" ${idx === 0 ? 'disabled style="opacity:0.3"' : ''}>▲</button>
       <button class="move-btn" data-dir="down" ${idx === items.length - 1 ? 'disabled style="opacity:0.3"' : ''}>▼</button>
-      <span class="edit-text">${item.text}</span>
+      <span class="edit-text">${esc(item.text)}</span>
       <button class="delete-btn">✕</button>
     `;
 
@@ -472,6 +497,9 @@ async function addItem() {
   const input = document.getElementById('new-item-input');
   const text = input.value.trim();
   if (!text) return;
+
+  const btn = document.getElementById('add-item-btn');
+  btn.disabled = true;
 
   const { data: existing } = await sb
     .from('checklist_items')
@@ -491,6 +519,7 @@ async function addItem() {
   });
 
   input.value = '';
+  btn.disabled = false;
   await loadEditMode();
 }
 
@@ -515,8 +544,8 @@ async function moveItem(itemId, direction) {
   const b = items[swapIdx];
 
   await Promise.all([
-    sb.from('checklist_items').update({ sort_order: b.sort_order }).eq('id', a.id),
-    sb.from('checklist_items').update({ sort_order: a.sort_order }).eq('id', b.id),
+    sb.from('checklist_items').update({ sort_order: swapIdx }).eq('id', a.id),
+    sb.from('checklist_items').update({ sort_order: idx }).eq('id', b.id),
   ]);
 
   await loadEditMode();
