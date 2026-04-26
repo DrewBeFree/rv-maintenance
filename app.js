@@ -179,12 +179,6 @@ async function seedIfEmpty() {
   if (itemErr) console.error('Seed items failed:', itemErr);
 }
 
-// ── Boot ──────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', async () => {
-  await seedIfEmpty();
-  await showHub();
-});
-
 // ── Hub View ──────────────────────────────────────────────────
 async function showHub() {
   document.getElementById('hub-view').classList.remove('hidden');
@@ -236,3 +230,63 @@ function isAreaOverdue(lastCompletedAt, intervalDays) {
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
+
+// ── Section View ──────────────────────────────────────────────
+async function showSection(area) {
+  currentArea = area;
+  sessionActive = false;
+  checkedItems.clear();
+
+  document.getElementById('hub-view').classList.add('hidden');
+  document.getElementById('section-view').classList.remove('hidden');
+  document.getElementById('section-icon').textContent = area.icon;
+  document.getElementById('section-title').textContent = area.name;
+
+  // Reset mode state
+  document.getElementById('run-mode').classList.remove('hidden');
+  document.getElementById('edit-mode').classList.add('hidden');
+  document.getElementById('edit-toggle').textContent = 'Edit';
+
+  await loadRunMode();
+  await loadHistory();
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await seedIfEmpty();
+  await showHub();
+
+  document.getElementById('back-btn').addEventListener('click', showHub);
+
+  document.getElementById('edit-toggle').addEventListener('click', () => {
+    const runMode = document.getElementById('run-mode');
+    const editMode = document.getElementById('edit-mode');
+    const btn = document.getElementById('edit-toggle');
+    const inEdit = !editMode.classList.contains('hidden');
+    if (inEdit) {
+      editMode.classList.add('hidden');
+      runMode.classList.remove('hidden');
+      btn.textContent = 'Edit';
+      loadRunMode();
+    } else {
+      runMode.classList.add('hidden');
+      editMode.classList.remove('hidden');
+      btn.textContent = 'Done';
+      loadEditMode();
+    }
+  });
+
+  document.getElementById('start-session-btn').addEventListener('click', startSession);
+  document.getElementById('complete-session-btn').addEventListener('click', completeSession);
+  document.getElementById('add-item-btn').addEventListener('click', addItem);
+  document.getElementById('new-item-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') addItem();
+  });
+});
+
+async function loadRunMode() {}
+async function loadHistory() {}
+async function startSession() {}
+async function completeSession() {}
+async function loadEditMode() {}
+async function addItem() {}
