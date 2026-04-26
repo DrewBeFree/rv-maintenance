@@ -184,3 +184,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   await seedIfEmpty();
   await showHub();
 });
+
+// ── Hub View ──────────────────────────────────────────────────
+async function showHub() {
+  document.getElementById('hub-view').classList.remove('hidden');
+  document.getElementById('section-view').classList.add('hidden');
+
+  const [{ data: areas }, { data: sessions }] = await Promise.all([
+    sb.from('areas').select('*').order('sort_order'),
+    sb.from('sessions').select('area_id, completed_at').order('completed_at', { ascending: false }),
+  ]);
+
+  const lastCompleted = {};
+  (sessions || []).forEach(s => {
+    if (!lastCompleted[s.area_id]) lastCompleted[s.area_id] = s.completed_at;
+  });
+
+  renderCards(areas || [], lastCompleted);
+}
+
+function renderCards(areas, lastCompleted) {
+  const grid = document.getElementById('card-grid');
+  grid.innerHTML = '';
+
+  areas.forEach(area => {
+    const last = lastCompleted[area.id];
+    const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
+
+    const card = document.createElement('div');
+    card.className = 'area-card';
+    card.innerHTML = `
+      <div class="card-icon">${area.icon}</div>
+      <div class="card-name">${area.name}</div>
+      ${last
+        ? `<div class="${isOverdue ? 'card-overdue' : 'card-last'}">${isOverdue ? 'Overdue' : formatDate(last)}</div>`
+        : `<div class="card-never">Never logged</div>`
+      }
+    `;
+    card.addEventListener('click', () => showSection(area));
+    grid.appendChild(card);
+  });
+}
+
+function isAreaOverdue(lastCompletedAt, intervalDays) {
+  if (!lastCompletedAt) return false;
+  const last = new Date(lastCompletedAt);
+  const due = new Date(last.getTime() + intervalDays * 86400000);
+  return due < new Date();
+}
+
+function formatDate(iso) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
