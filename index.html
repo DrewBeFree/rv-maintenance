@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RV Maintenance</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛺</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = 'https://vqfyaoanqpbcpbwtetcz.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_BQR3QmatKdMWtwIirlA5Dw_DLfiEOY9';
+  </script>
+</head>
+<body>
+
+  <!-- ── Hub View ── -->
+  <div id="hub-view">
+    <header>
+      <h1>⛺ RV MAINTENANCE</h1>
+      <p class="sub">Freedom Elite 26HE · 2019</p>
+    </header>
+    <div id="card-grid"></div>
+  </div>
+
+  <!-- ── Section View ── -->
+  <div id="section-view" class="hidden">
+    <header class="section-header">
+      <button id="back-btn">← Back</button>
+      <div class="section-title-wrap">
+        <span id="section-icon"></span>
+        <h2 id="section-title"></h2>
+      </div>
+      <button id="edit-toggle">Edit</button>
+    </header>
+
+    <!-- Run Mode -->
+    <div id="run-mode">
+      <div id="progress-wrap" class="hidden">
+        <div id="progress-bar"></div>
+        <span id="progress-label"></span>
+      </div>
+      <ul id="checklist"></ul>
+      <textarea id="session-notes" placeholder="Notes (optional)…" class="hidden"></textarea>
+      <div class="action-row">
+        <button id="start-session-btn" class="primary-btn">Start Session</button>
+        <button id="complete-session-btn" class="primary-btn hidden">Complete Session</button>
+      </div>
+    </div>
+
+    <!-- Edit Mode -->
+    <div id="edit-mode" class="hidden">
+      <ul id="edit-list"></ul>
+      <div class="add-row">
+        <input id="new-item-input" type="text" placeholder="Add checklist item…">
+        <button id="add-item-btn">Add</button>
+      </div>
+    </div>
+
+    <!-- History Panel -->
+    <div id="history-panel">
+      <h3 class="history-heading">History</h3>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
