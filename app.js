@@ -284,9 +284,105 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
-async function loadRunMode() {}
+async function loadRunMode() {
+  const { data: items } = await sb
+    .from('checklist_items')
+    .select('*')
+    .eq('area_id', currentArea.id)
+    .eq('is_active', true)
+    .order('sort_order');
+
+  const list = document.getElementById('checklist');
+  list.innerHTML = '';
+
+  (items || []).forEach(item => {
+    const li = document.createElement('li');
+    li.dataset.id = item.id;
+    li.dataset.text = item.text;
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.disabled = true;
+
+    const span = document.createElement('span');
+    span.className = 'item-text';
+    span.textContent = item.text;
+
+    li.appendChild(cb);
+    li.appendChild(span);
+    list.appendChild(li);
+  });
+
+  // Reset session UI state
+  document.getElementById('progress-wrap').classList.add('hidden');
+  document.getElementById('session-notes').classList.add('hidden');
+  document.getElementById('session-notes').value = '';
+  document.getElementById('start-session-btn').classList.remove('hidden');
+  document.getElementById('complete-session-btn').classList.add('hidden');
+  sessionActive = false;
+  checkedItems.clear();
+}
 async function loadHistory() {}
-async function startSession() {}
-async function completeSession() {}
+function startSession() {
+  sessionActive = true;
+  document.getElementById('start-session-btn').classList.add('hidden');
+  document.getElementById('complete-session-btn').classList.remove('hidden');
+  document.getElementById('session-notes').classList.remove('hidden');
+  document.getElementById('progress-wrap').classList.remove('hidden');
+
+  const items = document.querySelectorAll('#checklist li');
+  items.forEach(li => {
+    li.classList.add('active');
+    const cb = li.querySelector('input[type="checkbox"]');
+    cb.disabled = false;
+    li.addEventListener('click', e => {
+      if (e.target === cb) return;
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event('change'));
+    });
+    cb.addEventListener('change', () => {
+      if (cb.checked) {
+        checkedItems.add(li.dataset.id);
+        li.classList.add('checked');
+      } else {
+        checkedItems.delete(li.dataset.id);
+        li.classList.remove('checked');
+      }
+      updateProgress(items.length);
+    });
+  });
+
+  updateProgress(items.length);
+}
+
+function updateProgress(total) {
+  const count = checkedItems.size;
+  const pct = total ? Math.round((count / total) * 100) : 0;
+  document.getElementById('progress-bar').style.setProperty('--progress', pct + '%');
+  document.getElementById('progress-label').textContent = `${count} / ${total}`;
+}
+async function completeSession() {
+  const notes = document.getElementById('session-notes').value.trim() || null;
+
+  const { data: session, error: sessionErr } = await sb
+    .from('sessions')
+    .insert({ area_id: currentArea.id, notes })
+    .select()
+    .single();
+
+  if (sessionErr) { console.error('Session insert failed:', sessionErr); return; }
+
+  const allItems = document.querySelectorAll('#checklist li');
+  const sessionItems = Array.from(allItems).map(li => ({
+    session_id: session.id,
+    item_text: li.dataset.text,
+    checked: checkedItems.has(li.dataset.id),
+  }));
+
+  const { error: itemErr } = await sb.from('session_items').insert(sessionItems);
+  if (itemErr) console.error('Session items insert failed:', itemErr);
+
+  await showHub();
+}
 async function loadEditMode() {}
 async function addItem() {}
