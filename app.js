@@ -322,7 +322,62 @@ async function loadRunMode() {
   sessionActive = false;
   checkedItems.clear();
 }
-async function loadHistory() {}
+async function loadHistory() {
+  const { data: sessions } = await sb
+    .from('sessions')
+    .select('id, completed_at, notes')
+    .eq('area_id', currentArea.id)
+    .order('completed_at', { ascending: false });
+
+  const historyList = document.getElementById('history-list');
+  historyList.innerHTML = '';
+
+  if (!sessions || sessions.length === 0) {
+    historyList.innerHTML = '<p class="history-empty">No sessions logged yet.</p>';
+    document.getElementById('history-panel').classList.remove('hidden');
+    return;
+  }
+
+  for (const session of sessions) {
+    const { data: items } = await sb
+      .from('session_items')
+      .select('item_text, checked')
+      .eq('session_id', session.id);
+
+    const entry = document.createElement('div');
+    entry.className = 'history-entry';
+
+    const checkedCount = (items || []).filter(i => i.checked).length;
+    const total = (items || []).length;
+    const dateStr = new Date(session.completed_at).toLocaleDateString('en-US', {
+      month: 'long', day: 'numeric', year: 'numeric'
+    });
+
+    entry.innerHTML = `
+      <div class="history-entry-header">
+        <span class="history-date">${dateStr} &mdash; ${checkedCount}/${total} items</span>
+        <span class="history-toggle">▾ Details</span>
+      </div>
+      ${session.notes ? `<p class="history-notes">${session.notes}</p>` : ''}
+      <ul class="history-items">
+        ${(items || []).map(i =>
+          `<li class="${i.checked ? '' : 'unchecked'}">${i.item_text}</li>`
+        ).join('')}
+      </ul>
+    `;
+
+    entry.querySelector('.history-entry-header').addEventListener('click', () => {
+      const ul = entry.querySelector('.history-items');
+      const toggle = entry.querySelector('.history-toggle');
+      ul.classList.toggle('open');
+      toggle.textContent = ul.classList.contains('open') ? '▴ Hide' : '▾ Details';
+    });
+
+    historyList.appendChild(entry);
+  }
+
+  document.getElementById('history-panel').classList.remove('hidden');
+}
 function startSession() {
   sessionActive = true;
   document.getElementById('start-session-btn').classList.add('hidden');
