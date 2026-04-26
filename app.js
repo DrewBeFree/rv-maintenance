@@ -553,6 +553,9 @@ async function completeSession() {
     btn.disabled = false;
     return;
   }
+  if (notes && !session.notes) {
+    console.warn('Notes were entered but not saved — the `notes` column may be missing from the Supabase sessions table.');
+  }
 
   const allItems = document.querySelectorAll('#checklist li');
   const sessionItems = Array.from(allItems).map(li => ({
