@@ -202,8 +202,98 @@ async function showHub() {
     if (!lastCompleted[s.area_id]) lastCompleted[s.area_id] = s.completed_at;
   });
 
+  renderDashboard(areas || [], lastCompleted, sessions || []);
   renderCards(areas || [], lastCompleted);
 }
+
+function renderDashboard(areas, lastCompleted, allSessions) {
+  const areaMap = {};
+  areas.forEach(a => { areaMap[a.id] = a; });
+
+  let overdueCount = 0, okCount = 0;
+  areas.forEach(area => {
+    const status = getCardStatus(lastCompleted[area.id], area.reminder_interval_days);
+    if (status === 'overdue') overdueCount++;
+    if (status === 'ok' || status === 'due-soon') okCount++;
+  });
+
+  const healthPct = areas.length ? Math.round((okCount / areas.length) * 100) : 0;
+  const ringColor = healthPct >= 70 ? '#4ade80' : healthPct >= 40 ? '#f59e0b' : '#ef4444';
+  const ring = document.getElementById('health-ring');
+  ring.style.background = `conic-gradient(${ringColor} ${healthPct}%, rgba(255,255,255,0.08) 0)`;
+  ring.style.color = ringColor;
+  ring.textContent = healthPct + '%';
+
+  document.getElementById('vc-sessions').textContent = allSessions.length + ' sessions logged';
+
+  const setVal = (id, text, color) => {
+    const pill = document.getElementById(id);
+    const v = pill.querySelector('.stat-val');
+    v.textContent = text;
+    if (color) v.style.color = color;
+  };
+  setVal('stat-overdue', overdueCount, overdueCount > 0 ? '#ef4444' : '#4ade80');
+  setVal('stat-ok', okCount, '#4ade80');
+
+  const mostRecent = allSessions[0];
+  if (mostRecent) {
+    const diff = Math.floor((Date.now() - new Date(mostRecent.completed_at)) / 86400000);
+    setVal('stat-since', diff === 0 ? 'Today' : diff + 'd');
+  } else {
+    setVal('stat-since', '—');
+  }
+  setVal('stat-sessions', allSessions.length);
+
+  // Recent activity
+  const recentList = document.getElementById('recent-list');
+  recentList.innerHTML = '';
+  const recent = allSessions.slice(0, 3);
+  if (recent.length === 0) {
+    recentList.innerHTML = '<div class="act-empty">No sessions yet</div>';
+  } else {
+    recent.forEach(s => {
+      const area = areaMap[s.area_id];
+      if (!area) return;
+      const div = document.createElement('div');
+      div.className = 'act-entry';
+      div.innerHTML = `<span class="act-icon">${area.icon}</span><span class="act-label">${esc(area.name)}</span><span class="act-date">${formatDate(s.completed_at)}</span>`;
+      recentList.appendChild(div);
+    });
+  }
+
+  // Coming due — sorted by urgency
+  const dueList = document.getElementById('due-list');
+  dueList.innerHTML = '';
+  const now = Date.now();
+  const dueItems = areas
+    .filter(a => lastCompleted[a.id])
+    .map(a => {
+      const daysUntil = Math.ceil((new Date(lastCompleted[a.id]).getTime() + a.reminder_interval_days * 86400000 - now) / 86400000);
+      return { area: a, daysUntil };
+    })
+    .sort((a, b) => a.daysUntil - b.daysUntil)
+    .slice(0, 3);
+
+  if (dueItems.length === 0) {
+    dueList.innerHTML = '<div class="act-empty">No data yet</div>';
+  } else {
+    dueItems.forEach(({ area, daysUntil }) => {
+      const div = document.createElement('div');
+      div.className = 'act-entry';
+      const badge = daysUntil < 0
+        ? `<span class="act-overdue">Overdue</span>`
+        : daysUntil === 0
+          ? `<span class="act-due-soon">Today</span>`
+          : daysUntil <= 14
+            ? `<span class="act-due-soon">in ${daysUntil}d</span>`
+            : `<span class="act-date">in ${daysUntil}d</span>`;
+      div.innerHTML = `<span class="act-icon">${area.icon}</span><span class="act-label">${esc(area.name)}</span>${badge}`;
+      dueList.appendChild(div);
+    });
+  }
+}
+
+const STATUS_EMOJI = { 'ok': '🟢', 'due-soon': '🟡', 'overdue': '🔴', 'never': '⚪' };
 
 function renderCards(areas, lastCompleted) {
   const grid = document.getElementById('card-grid');
@@ -212,10 +302,12 @@ function renderCards(areas, lastCompleted) {
   areas.forEach(area => {
     const last = lastCompleted[area.id];
     const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
+    const status = getCardStatus(last, area.reminder_interval_days);
 
     const card = document.createElement('div');
     card.className = 'area-card';
     card.innerHTML = `
+      <div class="status-dot">${STATUS_EMOJI[status]}</div>
       <div class="card-icon">${area.icon}</div>
       <div class="card-name">${area.name}</div>
       ${last
@@ -226,6 +318,15 @@ function renderCards(areas, lastCompleted) {
     card.addEventListener('click', () => showSection(area));
     grid.appendChild(card);
   });
+}
+
+function getCardStatus(lastCompletedAt, intervalDays) {
+  if (!lastCompletedAt) return 'never';
+  const due = new Date(new Date(lastCompletedAt).getTime() + intervalDays * 86400000);
+  const now = new Date();
+  if (due < now) return 'overdue';
+  if ((due - now) / 86400000 <= 14) return 'due-soon';
+  return 'ok';
 }
 
 function isAreaOverdue(lastCompletedAt, intervalDays) {

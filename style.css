@@ -67,6 +67,7 @@ body::before {
   backdrop-filter: blur(6px);
   transition: border-color 0.2s, transform 0.15s;
   user-select: none;
+  position: relative;
 }
 
 .area-card:hover {
@@ -441,4 +442,191 @@ body::before {
   font-family: sans-serif;
   text-align: center;
   padding: 20px 0;
+}
+
+/* ── Hub Dashboard ── */
+#hub-dashboard {
+  position: relative; z-index: 1;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 20px 16px 0;
+}
+
+#vehicle-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(10,6,0,0.65);
+  border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  backdrop-filter: blur(6px);
+}
+
+.vc-icon { font-size: 34px; flex-shrink: 0; }
+
+.vc-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fcd34d;
+  font-family: Georgia, serif;
+}
+
+.vc-meta {
+  font-size: 0.68rem;
+  color: rgba(255,255,255,0.4);
+  font-family: sans-serif;
+  margin-top: 3px;
+  letter-spacing: 1px;
+}
+
+.vc-sessions {
+  font-size: 0.63rem;
+  color: rgba(255,255,255,0.28);
+  font-family: sans-serif;
+  margin-top: 3px;
+  letter-spacing: 1px;
+}
+
+.health-block { margin-left: auto; text-align: center; flex-shrink: 0; }
+
+.health-ring {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: sans-serif;
+  margin: 0 auto;
+}
+
+.health-label {
+  font-size: 0.58rem;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 4px;
+  font-family: sans-serif;
+}
+
+#stats-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.stat-pill {
+  flex: 1;
+  background: rgba(10,6,0,0.65);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 8px;
+  padding: 10px 8px;
+  text-align: center;
+  backdrop-filter: blur(6px);
+}
+
+.stat-val {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #fcd34d;
+  font-family: Georgia, serif;
+  line-height: 1;
+}
+
+.stat-lbl {
+  font-size: 0.58rem;
+  color: rgba(255,255,255,0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-top: 4px;
+  font-family: sans-serif;
+}
+
+#activity-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.activity-panel {
+  background: rgba(10,6,0,0.65);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  backdrop-filter: blur(6px);
+}
+
+.panel-heading {
+  font-size: 0.58rem;
+  color: rgba(255,255,255,0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  font-family: sans-serif;
+}
+
+.act-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-family: sans-serif;
+}
+
+.act-entry:last-child { border-bottom: none; }
+
+.act-icon { font-size: 13px; flex-shrink: 0; }
+
+.act-label {
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.7);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.act-date {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.28);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.act-overdue {
+  font-size: 0.65rem;
+  color: #ef4444;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.act-due-soon {
+  font-size: 0.65rem;
+  color: #f59e0b;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.act-empty {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.2);
+  font-family: sans-serif;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.status-dot {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  font-size: 10px;
+  line-height: 1;
 }
