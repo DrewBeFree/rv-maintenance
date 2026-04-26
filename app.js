@@ -394,12 +394,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadRunMode() {
-  const { data: items } = await sb
-    .from('checklist_items')
-    .select('*')
-    .eq('area_id', currentArea.id)
-    .eq('is_active', true)
-    .order('sort_order');
+  const [{ data: items }, { data: pastSessions }] = await Promise.all([
+    sb.from('checklist_items').select('*').eq('area_id', currentArea.id).eq('is_active', true).order('sort_order'),
+    sb.from('sessions').select('id, completed_at').eq('area_id', currentArea.id),
+  ]);
+
+  // Build item_text → most recent completed_at map from checked session_items
+  const lastDoneMap = {};
+  const sessionIds = (pastSessions || []).map(s => s.id);
+  if (sessionIds.length > 0) {
+    const sessionDateMap = {};
+    (pastSessions || []).forEach(s => { sessionDateMap[s.id] = s.completed_at; });
+
+    const { data: checkedItems } = await sb
+      .from('session_items')
+      .select('item_text, session_id')
+      .in('session_id', sessionIds)
+      .eq('checked', true);
+
+    (checkedItems || []).forEach(ci => {
+      const date = sessionDateMap[ci.session_id];
+      if (date && (!lastDoneMap[ci.item_text] || date > lastDoneMap[ci.item_text])) {
+        lastDoneMap[ci.item_text] = date;
+      }
+    });
+  }
 
   const list = document.getElementById('checklist');
   list.innerHTML = '';
@@ -413,12 +432,21 @@ async function loadRunMode() {
     cb.type = 'checkbox';
     cb.disabled = true;
 
+    const textWrap = document.createElement('div');
+    textWrap.className = 'item-text-wrap';
+
     const span = document.createElement('span');
     span.className = 'item-text';
     span.textContent = item.text;
 
+    const dateSpan = document.createElement('span');
+    dateSpan.className = 'item-last';
+    dateSpan.textContent = lastDoneMap[item.text] ? 'Last: ' + formatDate(lastDoneMap[item.text]) : 'Never done';
+
+    textWrap.appendChild(span);
+    textWrap.appendChild(dateSpan);
     li.appendChild(cb);
-    li.appendChild(span);
+    li.appendChild(textWrap);
     list.appendChild(li);
   });
 

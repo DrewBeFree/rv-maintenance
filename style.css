@@ -227,6 +227,14 @@ body::before {
   flex-shrink: 0;
 }
 
+.item-text-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
 #checklist li .item-text {
   color: #e2c97a;
   font-size: 0.88rem;
@@ -234,9 +242,19 @@ body::before {
   line-height: 1.4;
 }
 
+#checklist li .item-last {
+  color: rgba(161,98,7,0.6);
+  font-size: 0.65rem;
+  font-family: sans-serif;
+}
+
 #checklist li.checked .item-text {
   color: rgba(226,201,122,0.4);
   text-decoration: line-through;
+}
+
+#checklist li.checked .item-last {
+  color: rgba(161,98,7,0.35);
 }
 
 /* ── Session Notes ── */
