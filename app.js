@@ -512,8 +512,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
-  document.getElementById('start-session-btn').addEventListener('click', startSession);
-  document.getElementById('complete-session-btn').addEventListener('click', completeSession);
+  document.querySelectorAll('.start-session-btn').forEach(btn => btn.addEventListener('click', startSession));
+  document.querySelectorAll('.complete-session-btn').forEach(btn => btn.addEventListener('click', completeSession));
   document.getElementById('add-item-btn').addEventListener('click', addItem);
   document.getElementById('new-item-input').addEventListener('keydown', e => {
     if (e.key === 'Enter') addItem();
@@ -580,8 +580,8 @@ async function loadRunMode() {
     document.getElementById('progress-wrap').classList.add('hidden');
     document.getElementById('session-footer').classList.add('hidden');
     document.getElementById('session-notes').value = '';
-    document.getElementById('start-session-btn').classList.remove('hidden');
-    document.getElementById('complete-session-btn').classList.add('hidden');
+    document.querySelectorAll('.start-session-btn').forEach(b => b.classList.remove('hidden'));
+    document.querySelectorAll('.complete-session-btn').forEach(b => b.classList.add('hidden'));
   }
 }
 
@@ -595,8 +595,8 @@ function activateSession(checkedIdsToRestore = []) {
   if (!dateEl.value) dateEl.value = today;
   dateEl.max = today;
 
-  document.getElementById('start-session-btn').classList.add('hidden');
-  document.getElementById('complete-session-btn').classList.remove('hidden');
+  document.querySelectorAll('.start-session-btn').forEach(b => b.classList.add('hidden'));
+  document.querySelectorAll('.complete-session-btn').forEach(b => b.classList.remove('hidden'));
   document.getElementById('session-footer').classList.remove('hidden');
   document.getElementById('progress-wrap').classList.remove('hidden');
 
@@ -740,9 +740,7 @@ async function loadHistory() {
 async function startSession() {
   if (sessionActive) return;
 
-  const btn = document.getElementById('start-session-btn');
-  btn.disabled = true;
-  btn.textContent = 'Starting…';
+  document.querySelectorAll('.start-session-btn').forEach(b => { b.disabled = true; b.textContent = 'Starting…'; });
 
   // Delete any stale in-progress sessions so the insert doesn't conflict
   await sb.from('sessions').delete().eq('area_id', currentArea.id).is('completed_at', null);
@@ -754,8 +752,7 @@ async function startSession() {
 
   if (error) {
     console.error('Failed to start session:', error);
-    btn.disabled = false;
-    btn.textContent = 'Start Session';
+    document.querySelectorAll('.start-session-btn').forEach(b => { b.disabled = false; b.textContent = 'Start Session'; });
     alert('Failed to start session. Please try again.');
     return;
   }
@@ -772,8 +769,7 @@ function updateProgress(total) {
   document.getElementById('progress-label').textContent = `${count} / ${total}`;
 }
 async function completeSession() {
-  const btn = document.getElementById('complete-session-btn');
-  btn.disabled = true;
+  document.querySelectorAll('.complete-session-btn').forEach(b => b.disabled = true);
 
   const notes = document.getElementById('session-notes').value.trim() || null;
   const dateVal = document.getElementById('session-date').value;
@@ -789,7 +785,7 @@ async function completeSession() {
   if (sessionErr) {
     console.error('Session complete failed:', sessionErr);
     alert('Failed to save session. Check the console for details.');
-    btn.disabled = false;
+    document.querySelectorAll('.complete-session-btn').forEach(b => b.disabled = false);
     return;
   }
 
