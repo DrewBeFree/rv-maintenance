@@ -276,8 +276,6 @@ async function showHub() {
     (areas || []).filter(a => localStorage.getItem(`rv_session_${a.id}`)).map(a => a.id)
   );
 
-  const liveAreaIds = new Set((liveSessions || []).map(s => s.area_id));
-
   renderDashboard(areas || [], lastCompleted, sessions || []);
   renderCards(areas || [], lastCompleted, liveAreaIds);
 }
