@@ -233,6 +233,26 @@ body::before {
   font-family: sans-serif;
 }
 
+.due-ok {
+  color: rgba(255,255,255,0.55);
+  font-size: 0.65rem;
+  font-family: sans-serif;
+}
+
+.due-warn {
+  color: #f59e0b;
+  font-size: 0.65rem;
+  font-family: sans-serif;
+  font-weight: 600;
+}
+
+.due-overdue {
+  color: #ef4444;
+  font-size: 0.65rem;
+  font-family: sans-serif;
+  font-weight: 600;
+}
+
 /* ── Section View ── */
 #section-view {
   position: relative; z-index: 1;

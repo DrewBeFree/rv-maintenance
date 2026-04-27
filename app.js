@@ -379,9 +379,9 @@ function renderCards(areas, lastCompleted, liveAreaIds = new Set()) {
   tripGrid.innerHTML = '';
   tripAreas.forEach(area => {
     const last = lastCompleted[area.id];
-    const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
     const status = getCardStatus(last, area.reminder_interval_days);
     const isLive = liveAreaIds.has(area.id);
+    const dueInfo = getDueDisplay(last, area.reminder_interval_days);
     const card = document.createElement('div');
     card.className = 'area-card';
     card.innerHTML = `
@@ -391,7 +391,8 @@ function renderCards(areas, lastCompleted, liveAreaIds = new Set()) {
       <div class="card-icon">${area.icon}</div>
       <div class="card-name">${area.name}</div>
       ${last
-        ? `<div class="${isOverdue ? 'card-overdue' : 'card-last'}">${isOverdue ? 'Overdue' : formatDate(last)}</div>`
+        ? `<div class="card-last">${formatDate(last)}</div>
+           <div class="${dueInfo.cls}">${dueInfo.text}</div>`
         : `<div class="card-never">Not started</div>`
       }
     `;
@@ -409,16 +410,15 @@ function renderCards(areas, lastCompleted, liveAreaIds = new Set()) {
     const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
     const status = getCardStatus(last, area.reminder_interval_days);
     const isLive = liveAreaIds.has(area.id);
+    const dueInfo = getDueDisplay(last, area.reminder_interval_days);
     if (isOverdue) overdueCount++;
 
     const row = document.createElement('div');
     row.className = 'maint-row';
     const datePart = isLive
       ? `<span class="live-dot">● LIVE</span>`
-      : last
-        ? (isOverdue
-            ? `<span class="card-overdue">Overdue</span>`
-            : `<span class="maint-last">${formatDate(last)}</span>`)
+      : dueInfo
+        ? `<span class="${dueInfo.cls}">${dueInfo.text}</span>`
         : `<span class="maint-never">Never</span>`;
     row.innerHTML = `
       <span class="maint-icon">${area.icon}</span>
@@ -458,6 +458,16 @@ function isAreaOverdue(lastCompletedAt, intervalDays) {
 
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+function getDueDisplay(lastCompletedAt, intervalDays) {
+  if (!lastCompletedAt) return null;
+  const due = new Date(new Date(lastCompletedAt).getTime() + intervalDays * 86400000);
+  const daysUntil = Math.ceil((due - new Date()) / 86400000);
+  if (daysUntil < 0) return { text: `${Math.abs(daysUntil)}d overdue`, cls: 'due-overdue' };
+  if (daysUntil === 0) return { text: 'Due today', cls: 'due-warn' };
+  if (daysUntil <= 14) return { text: `Due in ${daysUntil}d`, cls: 'due-warn' };
+  return { text: `Due ${due.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`, cls: 'due-ok' };
 }
 
 // ── Section View ──────────────────────────────────────────────
