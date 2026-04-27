@@ -524,7 +524,7 @@ async function loadRunMode() {
   const [{ data: items }, { data: pastSessions }, { data: inProgress }] = await Promise.all([
     sb.from('checklist_items').select('*').eq('area_id', currentArea.id).eq('is_active', true).order('sort_order'),
     sb.from('sessions').select('id, completed_at').eq('area_id', currentArea.id).not('completed_at', 'is', null),
-    sb.from('sessions').select('id').eq('area_id', currentArea.id).is('completed_at', null).maybeSingle(),
+    sb.from('sessions').select('id').eq('area_id', currentArea.id).is('completed_at', null).limit(1).maybeSingle(),
   ]);
 
   // Build item_text → most recent completed_at from checked session_items
@@ -740,12 +740,25 @@ async function loadHistory() {
 async function startSession() {
   if (sessionActive) return;
 
+  const btn = document.getElementById('start-session-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  // Delete any stale in-progress sessions so the insert doesn't conflict
+  await sb.from('sessions').delete().eq('area_id', currentArea.id).is('completed_at', null);
+
   const { data: session, error } = await sb
     .from('sessions')
     .insert({ area_id: currentArea.id, completed_at: null, notes: null })
     .select().single();
 
-  if (error) { console.error('Failed to start session:', error); return; }
+  if (error) {
+    console.error('Failed to start session:', error);
+    btn.disabled = false;
+    btn.textContent = 'Start Session';
+    alert('Failed to start session. Please try again.');
+    return;
+  }
 
   currentSessionId = session.id;
   saveSessionLocally();
