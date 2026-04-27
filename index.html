@@ -80,7 +80,13 @@
         <span id="progress-label"></span>
       </div>
       <ul id="checklist"></ul>
-      <textarea id="session-notes" placeholder="Notes (optional)…" class="hidden" rows="4"></textarea>
+      <div id="session-footer" class="hidden">
+        <div id="session-date-row">
+          <label class="session-date-label" for="session-date">Date</label>
+          <input type="date" id="session-date">
+        </div>
+        <textarea id="session-notes" placeholder="Notes (optional)…" rows="3"></textarea>
+      </div>
       <div class="action-row">
         <button id="start-session-btn" class="primary-btn">Start Session</button>
         <button id="complete-session-btn" class="primary-btn hidden">Complete Session</button>

@@ -354,7 +354,44 @@ body::before {
   color: rgba(255,255,255,0.2);
 }
 
-/* ── Session Notes ── */
+/* ── Session Footer (date + notes) ── */
+#session-footer {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#session-date-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.session-date-label {
+  font-size: 0.68rem;
+  color: rgba(252,211,77,0.55);
+  font-family: sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+#session-date {
+  background: rgba(10,6,0,0.55);
+  border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 8px;
+  color: #e2c97a;
+  font-family: sans-serif;
+  font-size: 0.88rem;
+  padding: 7px 12px;
+  backdrop-filter: blur(4px);
+  flex: 1;
+  color-scheme: dark;
+}
+
+#session-date:focus { outline: none; border-color: rgba(251,191,36,0.5); }
+
 #session-notes {
   width: 100%;
   background: rgba(10,6,0,0.55);
@@ -366,7 +403,6 @@ body::before {
   padding: 10px 14px;
   resize: vertical;
   min-height: 70px;
-  margin-bottom: 16px;
   backdrop-filter: blur(4px);
 }
 

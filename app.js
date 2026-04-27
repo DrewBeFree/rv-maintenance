@@ -3,6 +3,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentArea = null;
 let sessionActive = false;
 let checkedItems = new Set();
+let currentSessionId = null;
 
 function esc(str) {
   return String(str)
@@ -263,7 +264,7 @@ async function showHub() {
 
   const [{ data: areas }, { data: sessions }] = await Promise.all([
     sb.from('areas').select('*').order('sort_order'),
-    sb.from('sessions').select('area_id, completed_at').order('completed_at', { ascending: false }),
+    sb.from('sessions').select('area_id, completed_at').not('completed_at', 'is', null).order('completed_at', { ascending: false }),
   ]);
 
   const lastCompleted = {};
@@ -511,55 +512,45 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadRunMode() {
-  const [{ data: items }, { data: pastSessions }] = await Promise.all([
+  const [{ data: items }, { data: pastSessions }, { data: inProgress }] = await Promise.all([
     sb.from('checklist_items').select('*').eq('area_id', currentArea.id).eq('is_active', true).order('sort_order'),
-    sb.from('sessions').select('id, completed_at').eq('area_id', currentArea.id),
+    sb.from('sessions').select('id, completed_at').eq('area_id', currentArea.id).not('completed_at', 'is', null),
+    sb.from('sessions').select('id').eq('area_id', currentArea.id).is('completed_at', null).maybeSingle(),
   ]);
 
-  // Build item_text → most recent completed_at map from checked session_items
+  // Build item_text → most recent completed_at from checked session_items
   const lastDoneMap = {};
-  const sessionIds = (pastSessions || []).map(s => s.id);
-  if (sessionIds.length > 0) {
+  const completedIds = (pastSessions || []).map(s => s.id);
+  if (completedIds.length > 0) {
     const sessionDateMap = {};
     (pastSessions || []).forEach(s => { sessionDateMap[s.id] = s.completed_at; });
-
-    const { data: checkedItems } = await sb
-      .from('session_items')
-      .select('item_text, session_id')
-      .in('session_id', sessionIds)
-      .eq('checked', true);
-
-    (checkedItems || []).forEach(ci => {
+    const { data: doneItems } = await sb
+      .from('session_items').select('item_text, session_id')
+      .in('session_id', completedIds).eq('checked', true);
+    (doneItems || []).forEach(ci => {
       const date = sessionDateMap[ci.session_id];
-      if (date && (!lastDoneMap[ci.item_text] || date > lastDoneMap[ci.item_text])) {
+      if (date && (!lastDoneMap[ci.item_text] || date > lastDoneMap[ci.item_text]))
         lastDoneMap[ci.item_text] = date;
-      }
     });
   }
 
   const list = document.getElementById('checklist');
   list.innerHTML = '';
-
   (items || []).forEach(item => {
     const li = document.createElement('li');
     li.dataset.id = item.id;
     li.dataset.text = item.text;
-
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.disabled = true;
-
     const textWrap = document.createElement('div');
     textWrap.className = 'item-text-wrap';
-
     const span = document.createElement('span');
     span.className = 'item-text';
     span.textContent = item.text;
-
     const dateSpan = document.createElement('span');
     dateSpan.className = 'item-last';
     dateSpan.textContent = lastDoneMap[item.text] ? 'Last: ' + formatDate(lastDoneMap[item.text]) : 'Never done';
-
     textWrap.appendChild(span);
     textWrap.appendChild(dateSpan);
     li.appendChild(cb);
@@ -567,20 +558,77 @@ async function loadRunMode() {
     list.appendChild(li);
   });
 
-  // Reset session UI state
-  document.getElementById('progress-wrap').classList.add('hidden');
-  document.getElementById('session-notes').classList.add('hidden');
-  document.getElementById('session-notes').value = '';
-  document.getElementById('start-session-btn').classList.remove('hidden');
-  document.getElementById('complete-session-btn').classList.add('hidden');
-  sessionActive = false;
+  if (inProgress) {
+    // Resume in-progress session
+    currentSessionId = inProgress.id;
+    const stored = JSON.parse(localStorage.getItem(`rv_session_${currentArea.id}`) || 'null');
+    const toRestore = (stored && stored.sessionId === inProgress.id) ? stored.checkedIds : [];
+    activateSession(toRestore);
+  } else {
+    currentSessionId = null;
+    checkedItems.clear();
+    sessionActive = false;
+    document.getElementById('progress-wrap').classList.add('hidden');
+    document.getElementById('session-footer').classList.add('hidden');
+    document.getElementById('session-notes').value = '';
+    document.getElementById('start-session-btn').classList.remove('hidden');
+    document.getElementById('complete-session-btn').classList.add('hidden');
+  }
+}
+
+function activateSession(checkedIdsToRestore = []) {
+  sessionActive = true;
   checkedItems.clear();
+  checkedIdsToRestore.forEach(id => checkedItems.add(id));
+
+  const today = new Date().toISOString().split('T')[0];
+  const dateEl = document.getElementById('session-date');
+  if (!dateEl.value) dateEl.value = today;
+  dateEl.max = today;
+
+  document.getElementById('start-session-btn').classList.add('hidden');
+  document.getElementById('complete-session-btn').classList.remove('hidden');
+  document.getElementById('session-footer').classList.remove('hidden');
+  document.getElementById('progress-wrap').classList.remove('hidden');
+
+  const listItems = document.querySelectorAll('#checklist li');
+  listItems.forEach(li => {
+    li.classList.add('active');
+    const cb = li.querySelector('input[type="checkbox"]');
+    cb.disabled = false;
+    if (checkedItems.has(li.dataset.id)) {
+      cb.checked = true;
+      li.classList.add('checked');
+    }
+    li.addEventListener('click', e => {
+      if (e.target === cb) return;
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event('change'));
+    });
+    cb.addEventListener('change', () => {
+      if (cb.checked) { checkedItems.add(li.dataset.id); li.classList.add('checked'); }
+      else { checkedItems.delete(li.dataset.id); li.classList.remove('checked'); }
+      updateProgress(listItems.length);
+      saveSessionLocally();
+    });
+  });
+
+  updateProgress(listItems.length);
+}
+
+function saveSessionLocally() {
+  if (!currentSessionId || !currentArea) return;
+  localStorage.setItem(`rv_session_${currentArea.id}`, JSON.stringify({
+    sessionId: currentSessionId,
+    checkedIds: Array.from(checkedItems),
+  }));
 }
 async function loadHistory() {
   const { data: sessions } = await sb
     .from('sessions')
     .select('id, completed_at, notes')
     .eq('area_id', currentArea.id)
+    .not('completed_at', 'is', null)
     .order('completed_at', { ascending: false });
 
   const historyList = document.getElementById('history-list');
@@ -641,37 +689,19 @@ async function loadHistory() {
 
   document.getElementById('history-panel').classList.remove('hidden');
 }
-function startSession() {
+async function startSession() {
   if (sessionActive) return;
-  sessionActive = true;
-  document.getElementById('start-session-btn').classList.add('hidden');
-  document.getElementById('complete-session-btn').classList.remove('hidden');
-  document.getElementById('session-notes').classList.remove('hidden');
-  document.getElementById('progress-wrap').classList.remove('hidden');
 
-  const items = document.querySelectorAll('#checklist li');
-  items.forEach(li => {
-    li.classList.add('active');
-    const cb = li.querySelector('input[type="checkbox"]');
-    cb.disabled = false;
-    li.addEventListener('click', e => {
-      if (e.target === cb) return;
-      cb.checked = !cb.checked;
-      cb.dispatchEvent(new Event('change'));
-    });
-    cb.addEventListener('change', () => {
-      if (cb.checked) {
-        checkedItems.add(li.dataset.id);
-        li.classList.add('checked');
-      } else {
-        checkedItems.delete(li.dataset.id);
-        li.classList.remove('checked');
-      }
-      updateProgress(items.length);
-    });
-  });
+  const { data: session, error } = await sb
+    .from('sessions')
+    .insert({ area_id: currentArea.id, completed_at: null, notes: null })
+    .select().single();
 
-  updateProgress(items.length);
+  if (error) { console.error('Failed to start session:', error); return; }
+
+  currentSessionId = session.id;
+  saveSessionLocally();
+  activateSession();
 }
 
 function updateProgress(total) {
@@ -685,32 +715,35 @@ async function completeSession() {
   btn.disabled = true;
 
   const notes = document.getElementById('session-notes').value.trim() || null;
+  const dateVal = document.getElementById('session-date').value;
+  const completedAt = dateVal
+    ? new Date(dateVal + 'T12:00:00').toISOString()
+    : new Date().toISOString();
 
-  const { data: session, error: sessionErr } = await sb
+  const { error: sessionErr } = await sb
     .from('sessions')
-    .insert({ area_id: currentArea.id, notes, completed_at: new Date().toISOString() })
-    .select()
-    .single();
+    .update({ completed_at: completedAt, notes })
+    .eq('id', currentSessionId);
 
   if (sessionErr) {
-    console.error('Session insert failed:', sessionErr);
+    console.error('Session complete failed:', sessionErr);
     alert('Failed to save session. Check the console for details.');
     btn.disabled = false;
     return;
   }
-  if (notes && !session.notes) {
-    console.warn('Notes were entered but not saved — the `notes` column may be missing from the Supabase sessions table.');
-  }
 
   const allItems = document.querySelectorAll('#checklist li');
   const sessionItems = Array.from(allItems).map(li => ({
-    session_id: session.id,
+    session_id: currentSessionId,
     item_text: li.dataset.text,
     checked: checkedItems.has(li.dataset.id),
   }));
 
   const { error: itemErr } = await sb.from('session_items').insert(sessionItems);
   if (itemErr) console.error('Session items insert failed:', itemErr);
+
+  localStorage.removeItem(`rv_session_${currentArea.id}`);
+  currentSessionId = null;
 
   await showHub();
 }
