@@ -667,30 +667,69 @@ async function loadHistory() {
     const entry = document.createElement('div');
     entry.className = 'history-entry';
 
-    const checkedCount = (items || []).filter(i => i.checked).length;
-    const total = (items || []).length;
-    const dateStr = new Date(session.completed_at).toLocaleDateString('en-US', {
+    const checkedCount = items.filter(i => i.checked).length;
+    const total = items.length;
+
+    const makeDateStr = iso => new Date(iso).toLocaleDateString('en-US', {
       month: 'long', day: 'numeric', year: 'numeric'
     });
 
     entry.innerHTML = `
       <div class="history-entry-header">
-        <span class="history-date">${dateStr} &mdash; ${checkedCount}/${total} items</span>
+        <div class="history-date-wrap">
+          <span class="history-date">${makeDateStr(session.completed_at)} &mdash; ${checkedCount}/${total} items</span>
+          <button class="edit-date-btn" title="Edit date">✎</button>
+        </div>
         <span class="history-toggle">▾ Details</span>
       </div>
       ${session.notes ? `<p class="history-notes">${esc(session.notes)}</p>` : ''}
       <ul class="history-items">
-        ${(items || []).map(i =>
-          `<li class="${i.checked ? '' : 'unchecked'}">${esc(i.item_text)}</li>`
-        ).join('')}
+        ${items.map(i => `<li class="${i.checked ? '' : 'unchecked'}">${esc(i.item_text)}</li>`).join('')}
       </ul>
     `;
 
-    entry.querySelector('.history-entry-header').addEventListener('click', () => {
+    entry.querySelector('.history-entry-header').addEventListener('click', e => {
+      if (e.target.closest('.edit-date-btn, .history-date-edit')) return;
       const ul = entry.querySelector('.history-items');
       const toggle = entry.querySelector('.history-toggle');
       ul.classList.toggle('open');
       toggle.textContent = ul.classList.contains('open') ? '▴ Hide' : '▾ Details';
+    });
+
+    entry.querySelector('.edit-date-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      const dateSpan = entry.querySelector('.history-date');
+      const editBtn = entry.querySelector('.edit-date-btn');
+      const currentVal = session.completed_at.split('T')[0];
+
+      const input = document.createElement('input');
+      input.type = 'date';
+      input.className = 'history-date-edit';
+      input.value = currentVal;
+      input.max = new Date().toISOString().split('T')[0];
+      dateSpan.replaceWith(input);
+      editBtn.textContent = '✕';
+      input.focus();
+
+      const cancel = () => {
+        input.replaceWith(dateSpan);
+        editBtn.textContent = '✎';
+      };
+
+      const commit = async () => {
+        if (!input.value || input.value === currentVal) { cancel(); return; }
+        const newIso = new Date(input.value + 'T12:00:00').toISOString();
+        const { error } = await sb.from('sessions').update({ completed_at: newIso }).eq('id', session.id);
+        if (error) { console.error('Date update failed:', error); cancel(); return; }
+        session.completed_at = newIso;
+        dateSpan.innerHTML = `${makeDateStr(newIso)} &mdash; ${checkedCount}/${total} items`;
+        input.replaceWith(dateSpan);
+        editBtn.textContent = '✎';
+      };
+
+      editBtn.onclick = e => { e.stopPropagation(); cancel(); editBtn.onclick = null; };
+      input.addEventListener('change', commit);
+      input.addEventListener('blur', () => setTimeout(() => { if (document.contains(input)) cancel(); }, 150));
     });
 
     historyList.appendChild(entry);
