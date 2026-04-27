@@ -363,16 +363,19 @@ function renderDashboard(areas, lastCompleted, allSessions) {
 }
 
 const STATUS_EMOJI = { 'ok': '🟢', 'due-soon': '🟡', 'overdue': '🔴', 'never': '⚪' };
+const TRIP_SLUGS = ['trip-departure', 'pack-out'];
 
 function renderCards(areas, lastCompleted) {
-  const grid = document.getElementById('card-grid');
-  grid.innerHTML = '';
+  const tripAreas = TRIP_SLUGS.map(s => areas.find(a => a.slug === s)).filter(Boolean);
+  const maintAreas = areas.filter(a => !TRIP_SLUGS.includes(a.slug));
 
-  areas.forEach(area => {
+  // Trip cards — full size
+  const tripGrid = document.getElementById('trip-grid');
+  tripGrid.innerHTML = '';
+  tripAreas.forEach(area => {
     const last = lastCompleted[area.id];
     const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
     const status = getCardStatus(last, area.reminder_interval_days);
-
     const card = document.createElement('div');
     card.className = 'area-card';
     card.innerHTML = `
@@ -385,8 +388,45 @@ function renderCards(areas, lastCompleted) {
       }
     `;
     card.addEventListener('click', () => showSection(area));
-    grid.appendChild(card);
+    tripGrid.appendChild(card);
   });
+
+  // Maintenance rows — compact, collapsible
+  const maintList = document.getElementById('maint-list');
+  maintList.innerHTML = '';
+  let overdueCount = 0;
+
+  maintAreas.forEach(area => {
+    const last = lastCompleted[area.id];
+    const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
+    const status = getCardStatus(last, area.reminder_interval_days);
+    if (isOverdue) overdueCount++;
+
+    const row = document.createElement('div');
+    row.className = 'maint-row';
+    const datePart = last
+      ? (isOverdue
+          ? `<span class="card-overdue">Overdue</span>`
+          : `<span class="maint-last">${formatDate(last)}</span>`)
+      : `<span class="maint-never">Never</span>`;
+    row.innerHTML = `
+      <span class="maint-icon">${area.icon}</span>
+      <span class="maint-name">${area.name}</span>
+      ${datePart}
+      <span class="maint-dot">${STATUS_EMOJI[status]}</span>
+    `;
+    row.addEventListener('click', () => showSection(area));
+    maintList.appendChild(row);
+  });
+
+  // Overdue badge on toggle
+  const badge = document.getElementById('maint-overdue-badge');
+  if (overdueCount > 0) {
+    badge.textContent = overdueCount + ' overdue';
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
 }
 
 function getCardStatus(lastCompletedAt, intervalDays) {
@@ -436,6 +476,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   await showHub();
 
   document.getElementById('back-btn').addEventListener('click', showHub);
+
+  document.getElementById('maint-toggle').addEventListener('click', () => {
+    const list = document.getElementById('maint-list');
+    const arrow = document.getElementById('maint-arrow');
+    const collapsed = list.classList.toggle('collapsed');
+    arrow.textContent = collapsed ? '▾' : '▴';
+  });
 
   document.getElementById('edit-toggle').addEventListener('click', () => {
     const runMode = document.getElementById('run-mode');
