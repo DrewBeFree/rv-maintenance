@@ -262,9 +262,10 @@ async function showHub() {
   document.getElementById('hub-view').classList.remove('hidden');
   document.getElementById('section-view').classList.add('hidden');
 
-  const [{ data: areas }, { data: sessions }] = await Promise.all([
+  const [{ data: areas }, { data: sessions }, { data: liveSessions }] = await Promise.all([
     sb.from('areas').select('*').order('sort_order'),
     sb.from('sessions').select('area_id, completed_at').not('completed_at', 'is', null).order('completed_at', { ascending: false }),
+    sb.from('sessions').select('area_id').is('completed_at', null),
   ]);
 
   const lastCompleted = {};
@@ -272,8 +273,10 @@ async function showHub() {
     if (!lastCompleted[s.area_id]) lastCompleted[s.area_id] = s.completed_at;
   });
 
+  const liveAreaIds = new Set((liveSessions || []).map(s => s.area_id));
+
   renderDashboard(areas || [], lastCompleted, sessions || []);
-  renderCards(areas || [], lastCompleted);
+  renderCards(areas || [], lastCompleted, liveAreaIds);
 }
 
 function renderDashboard(areas, lastCompleted, allSessions) {
@@ -366,7 +369,7 @@ function renderDashboard(areas, lastCompleted, allSessions) {
 const STATUS_EMOJI = { 'ok': '🟢', 'due-soon': '🟡', 'overdue': '🔴', 'never': '⚪' };
 const TRIP_SLUGS = ['trip-departure', 'pack-out'];
 
-function renderCards(areas, lastCompleted) {
+function renderCards(areas, lastCompleted, liveAreaIds = new Set()) {
   const tripAreas = TRIP_SLUGS.map(s => areas.find(a => a.slug === s)).filter(Boolean);
   const maintAreas = areas.filter(a => !TRIP_SLUGS.includes(a.slug));
 
@@ -377,15 +380,18 @@ function renderCards(areas, lastCompleted) {
     const last = lastCompleted[area.id];
     const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
     const status = getCardStatus(last, area.reminder_interval_days);
+    const isLive = liveAreaIds.has(area.id);
     const card = document.createElement('div');
     card.className = 'area-card';
     card.innerHTML = `
-      <div class="status-dot">${STATUS_EMOJI[status]}</div>
+      ${isLive
+        ? '<div class="live-badge">● LIVE</div>'
+        : `<div class="status-dot">${STATUS_EMOJI[status]}</div>`}
       <div class="card-icon">${area.icon}</div>
       <div class="card-name">${area.name}</div>
       ${last
         ? `<div class="${isOverdue ? 'card-overdue' : 'card-last'}">${isOverdue ? 'Overdue' : formatDate(last)}</div>`
-        : `<div class="card-never">Never logged</div>`
+        : `<div class="card-never">Not started</div>`
       }
     `;
     card.addEventListener('click', () => showSection(area));
@@ -401,20 +407,23 @@ function renderCards(areas, lastCompleted) {
     const last = lastCompleted[area.id];
     const isOverdue = isAreaOverdue(last, area.reminder_interval_days);
     const status = getCardStatus(last, area.reminder_interval_days);
+    const isLive = liveAreaIds.has(area.id);
     if (isOverdue) overdueCount++;
 
     const row = document.createElement('div');
     row.className = 'maint-row';
-    const datePart = last
-      ? (isOverdue
-          ? `<span class="card-overdue">Overdue</span>`
-          : `<span class="maint-last">${formatDate(last)}</span>`)
-      : `<span class="maint-never">Never</span>`;
+    const datePart = isLive
+      ? `<span class="live-dot">● LIVE</span>`
+      : last
+        ? (isOverdue
+            ? `<span class="card-overdue">Overdue</span>`
+            : `<span class="maint-last">${formatDate(last)}</span>`)
+        : `<span class="maint-never">Never</span>`;
     row.innerHTML = `
       <span class="maint-icon">${area.icon}</span>
       <span class="maint-name">${area.name}</span>
       ${datePart}
-      <span class="maint-dot">${STATUS_EMOJI[status]}</span>
+      ${isLive ? '' : `<span class="maint-dot">${STATUS_EMOJI[status]}</span>`}
     `;
     row.addEventListener('click', () => showSection(area));
     maintList.appendChild(row);
