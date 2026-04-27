@@ -262,16 +262,19 @@ async function showHub() {
   document.getElementById('hub-view').classList.remove('hidden');
   document.getElementById('section-view').classList.add('hidden');
 
-  const [{ data: areas }, { data: sessions }, { data: liveSessions }] = await Promise.all([
+  const [{ data: areas }, { data: sessions }] = await Promise.all([
     sb.from('areas').select('*').order('sort_order'),
-    sb.from('sessions').select('area_id, completed_at').not('completed_at', 'is', null).order('completed_at', { ascending: false }),
-    sb.from('sessions').select('area_id').is('completed_at', null),
+    sb.from('sessions').select('area_id, completed_at').order('completed_at', { ascending: false }),
   ]);
 
   const lastCompleted = {};
   (sessions || []).forEach(s => {
     if (!lastCompleted[s.area_id]) lastCompleted[s.area_id] = s.completed_at;
   });
+
+  const liveAreaIds = new Set(
+    (areas || []).filter(a => localStorage.getItem(`rv_session_${a.id}`)).map(a => a.id)
+  );
 
   const liveAreaIds = new Set((liveSessions || []).map(s => s.area_id));
 
@@ -521,10 +524,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadRunMode() {
-  const [{ data: items }, { data: pastSessions }, { data: inProgress }] = await Promise.all([
+  const [{ data: items }, { data: pastSessions }] = await Promise.all([
     sb.from('checklist_items').select('*').eq('area_id', currentArea.id).eq('is_active', true).order('sort_order'),
-    sb.from('sessions').select('id, completed_at').eq('area_id', currentArea.id).not('completed_at', 'is', null),
-    sb.from('sessions').select('id').eq('area_id', currentArea.id).is('completed_at', null).limit(1).maybeSingle(),
+    sb.from('sessions').select('id, completed_at').eq('area_id', currentArea.id),
   ]);
 
   // Build item_text → most recent completed_at from checked session_items
@@ -567,12 +569,10 @@ async function loadRunMode() {
     list.appendChild(li);
   });
 
-  if (inProgress) {
-    // Resume in-progress session
-    currentSessionId = inProgress.id;
-    const stored = JSON.parse(localStorage.getItem(`rv_session_${currentArea.id}`) || 'null');
-    const toRestore = (stored && stored.sessionId === inProgress.id) ? stored.checkedIds : [];
-    activateSession(toRestore);
+  const stored = JSON.parse(localStorage.getItem(`rv_session_${currentArea.id}`) || 'null');
+  if (stored && stored.sessionId) {
+    currentSessionId = stored.sessionId;
+    activateSession(stored.checkedIds || []);
   } else {
     currentSessionId = null;
     checkedItems.clear();
@@ -737,27 +737,9 @@ async function loadHistory() {
 
   document.getElementById('history-panel').classList.remove('hidden');
 }
-async function startSession() {
+function startSession() {
   if (sessionActive) return;
-
-  document.querySelectorAll('.start-session-btn').forEach(b => { b.disabled = true; b.textContent = 'Starting…'; });
-
-  // Delete any stale in-progress sessions so the insert doesn't conflict
-  await sb.from('sessions').delete().eq('area_id', currentArea.id).is('completed_at', null);
-
-  const { data: session, error } = await sb
-    .from('sessions')
-    .insert({ area_id: currentArea.id, completed_at: null, notes: null })
-    .select().single();
-
-  if (error) {
-    console.error('Failed to start session:', error);
-    document.querySelectorAll('.start-session-btn').forEach(b => { b.disabled = false; b.textContent = 'Start Session'; });
-    alert('Failed to start session: ' + (error.message || JSON.stringify(error)));
-    return;
-  }
-
-  currentSessionId = session.id;
+  currentSessionId = crypto.randomUUID();
   saveSessionLocally();
   activateSession();
 }
@@ -777,21 +759,21 @@ async function completeSession() {
     ? new Date(dateVal + 'T12:00:00').toISOString()
     : new Date().toISOString();
 
-  const { error: sessionErr } = await sb
+  const { data: sessionData, error: sessionErr } = await sb
     .from('sessions')
-    .update({ completed_at: completedAt, notes })
-    .eq('id', currentSessionId);
+    .insert({ area_id: currentArea.id, completed_at: completedAt, notes })
+    .select().single();
 
   if (sessionErr) {
     console.error('Session complete failed:', sessionErr);
-    alert('Failed to save session. Check the console for details.');
+    alert('Failed to save session: ' + (sessionErr.message || JSON.stringify(sessionErr)));
     document.querySelectorAll('.complete-session-btn').forEach(b => b.disabled = false);
     return;
   }
 
   const allItems = document.querySelectorAll('#checklist li');
   const sessionItems = Array.from(allItems).map(li => ({
-    session_id: currentSessionId,
+    session_id: sessionData.id,
     item_text: li.dataset.text,
     checked: checkedItems.has(li.dataset.id),
   }));
