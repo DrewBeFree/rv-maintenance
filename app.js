@@ -753,7 +753,7 @@ async function startSession() {
   if (error) {
     console.error('Failed to start session:', error);
     document.querySelectorAll('.start-session-btn').forEach(b => { b.disabled = false; b.textContent = 'Start Session'; });
-    alert('Failed to start session. Please try again.');
+    alert('Failed to start session: ' + (error.message || JSON.stringify(error)));
     return;
   }
 
