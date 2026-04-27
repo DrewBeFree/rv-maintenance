@@ -49,7 +49,7 @@ body::before {
 /* ── Trip Grid ── */
 #trip-grid {
   position: relative; z-index: 1;
-  max-width: 700px;
+  max-width: 480px;
   margin: 0 auto;
   padding: 16px 16px 0;
   display: grid;
@@ -60,7 +60,7 @@ body::before {
 /* ── Maintenance Section ── */
 #maint-section {
   position: relative; z-index: 1;
-  max-width: 700px;
+  max-width: 480px;
   margin: 0 auto;
   padding: 0 16px 60px;
 }
@@ -562,7 +562,7 @@ body::before {
 /* ── Hub Dashboard ── */
 #hub-dashboard {
   position: relative; z-index: 1;
-  max-width: 700px;
+  max-width: 480px;
   margin: 0 auto;
   padding: 20px 16px 0;
 }
